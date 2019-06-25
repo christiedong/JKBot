@@ -1,0 +1,6 @@
+.idea/
+.xls
+.bak/
+*.xls
+bak/
+log_debug.txt
