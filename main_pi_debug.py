@@ -54,17 +54,24 @@ def sendAlert(alertList):
     cnt = 0
     okcnt = 0
     logfp.write('SMS List:\n')
+    # 当一个人一天中有两个以上任务时，会出现重复发宋短信的情况，时间间隔应大于30秒 2019-06-25
+    # 记住已经发送的手机号，并判断当前号码是否已经发送过，若已经发送过，则延迟30秒再发
+    nlist=[]
     for a in alertList:
         number = a['number']
         params = a['params']
+        if number in nlist:
+            time.sleep(31) # 如果当前号码已经发送过，则延迟30秒再发送
         rst = send_sms(number, params)
         if rst['result'] == 0 and rst['errmsg'] =='OK':
             logfp.write('Number: %s, Message: %s老师，监考小助手提醒您%s的%s在%s有监考任务(%s)，请核实。\n' % (number, params['name'],params['date'],params['time'],params['location'],params['type']))
             okcnt = okcnt +1
+            nlist.append(number)  # 已发送成功的添加到列表中
         else:
             logfp.write('ERORR: %s' % str(rst))
         cnt = cnt + 1
-        time.sleep(0.3)
+
+        time.sleep(0.5)
     return cnt, okcnt
 
 
@@ -88,17 +95,26 @@ def sendAlertStub(alertList):
 # 发短信接口调用
 def send_sms(number, params):
     ssender = SmsSingleSender(appid, appkey)
-    params = [params['name'],params['date'],params['time'],params['location'],params['type']]  # 当模板没有参数时，`params = []`，数组具体的元素个数和模板中变量个数必须一致，例如示例中 templateId:5678 对应一个变量，参数数组中元素个数也必须是一个
+    params = [params['name'],
+              params['date'],
+              params['time'],
+              params['location'],
+              params['type']
+              ]  # 当模板没有参数时，`params = []`，数组具体的元素个数和模板中变量个数必须一致，例如示例中 templateId:5678 对应一个变量，参数数组中元素个数也必须是一个
     try:
         result = ssender.send_with_param(86, number,
                                          template_id, params, sign=sms_sign, extend="",
                                          ext="")  # 签名参数未提供或者为空时，会使用默认签名发送短信
     except HTTPError as e:
-        print(e)
-        logfp.write(str(e) + '\n')
+        errmsg = 'send_sms HTTPError:' + str(e) + ', for %s' % number
+        print(errmsg)
+        logfp.write(errmsg + '\n')
+        result = {'result': None, 'errmsg': errmsg}
     except Exception as e:
-        print(e)
-        logfp.write(str(e) + '\n')
+        errmsg = 'send_sms Error:' + str(e) + ', for %s' % number
+        print(errmsg)
+        logfp.write(errmsg + '\n')
+        result = {'result': None, 'errmsg': errmsg}
 
     return result
 
